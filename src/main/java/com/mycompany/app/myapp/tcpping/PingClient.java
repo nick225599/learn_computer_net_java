@@ -27,6 +27,7 @@ public class PingClient {
                     new byte[1024], 1024, new InetSocketAddress("127.0.0.1", PING_SERVER_PORT));
             request.setData(message.getBytes(StandardCharsets.UTF_8));
             socket.send(request);
+            socket.setSoTimeout(1000);
             socket.receive(response);
 
             printData(response);
@@ -57,6 +58,7 @@ public class PingClient {
             }
             stopWatch.reset();
         }
-        executorService.shutdown();
+        executorService.awaitTermination(13, TimeUnit.SECONDS);
+        executorService.shutdownNow();
     }
 }
