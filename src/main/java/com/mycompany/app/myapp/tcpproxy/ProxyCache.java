@@ -67,7 +67,6 @@ public class ProxyCache {
             DataInputStream fromServer = new DataInputStream(server.getInputStream());
             response = new HttpResponse(fromServer);
             DataOutputStream toClient = new DataOutputStream(client.getOutputStream());
-            /* Fill in */
             toClient.writeUTF(response.toString());
             /* Write response to client. First headers, then body */
             client.close();
