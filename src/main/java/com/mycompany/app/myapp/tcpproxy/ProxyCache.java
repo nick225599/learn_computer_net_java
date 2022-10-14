@@ -1,105 +1,77 @@
 package com.mycompany.app.myapp.tcpproxy;
 
-import java.io.BufferedReader;
-import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.net.UnknownHostException;
+import java.nio.charset.StandardCharsets;
 
 /**
  * ProxyCache.java - Simple caching proxy
- *
+ * <p>
  * $Id: ProxyCache.java,v 1.3 2004/02/16 15:22:00 kangasha Exp $
- *
  */
 public class ProxyCache {
-    /** Port for the proxy */
+    /**
+     * Port for the proxy
+     */
     private static int port;
-    /** Socket for client connections */
+    /**
+     * Socket for client connections
+     */
     private static ServerSocket socket;
 
-    /** Create the ProxyCache object and the socket */
-    public static void init() {
-        try {
-            socket = new ServerSocket(12001);
-        } catch (IOException e) {
-            System.out.println("Error creating socket: " + e);
-            System.exit(-1);
-        }
-    }
 
-    public static void handle(Socket client) {
-        Socket server = null;
-        HttpRequest request = null;
-        HttpResponse response = null;
-
-        /* Process request. If there are any exceptions, then simply
-         * return and end this request. This unfortunately means the
-         * client will hang for a while, until it timeouts. */
-
-        /* Read request */
+    public static void handle(Socket socketFromProxyClient) {
         try {
-            BufferedReader fromClient =new BufferedReader( new InputStreamReader(client.getInputStream()));
-            request = new HttpRequest(fromClient);
-        } catch (IOException e) {
-            System.out.println("Error reading request from client: " + e);
-            return;
-        }
-        /* Send request to server */
-        try {
+            Socket socketToRemoteWebServer = null;
+            DataOutputStream toServer;
+
+            HttpRequest httpRequest = HttpRequest.getHttpRequestFromSocketInputStream(
+                    socketFromProxyClient.getInputStream());
+
+            System.out.println("http request: ");
+            System.out.println(httpRequest);
+            System.out.println();
+
+
+
             /* Open socket and write request to socket */
-            server = new Socket(request.getHost(), request.getPort());
-            DataOutputStream toServer = new DataOutputStream(server.getOutputStream());
-            toServer.writeUTF(request.toString());
-        } catch (UnknownHostException e) {
-            System.out.println("Unknown host: " + request.getHost());
-            System.out.println(e);
-            return;
-        } catch (IOException e) {
-            System.out.println("Error writing request to server: " + e);
-            return;
-        }
-        /* Read response and forward it to client */
-        try {
-            DataInputStream fromServer = new DataInputStream(server.getInputStream());
-            response = new HttpResponse(fromServer);
-            DataOutputStream toClient = new DataOutputStream(client.getOutputStream());
-            toClient.writeUTF(response.toString());
+            socketToRemoteWebServer = new Socket(httpRequest.getHost(), httpRequest.getPort());
+            toServer = new DataOutputStream(socketToRemoteWebServer.getOutputStream());
+            toServer.write(httpRequest.toString().getBytes(StandardCharsets.UTF_8));
+
+            HttpResponse httpResponse = HttpResponse.getHttpRequestFromSocketInputStream(
+                    socketToRemoteWebServer.getInputStream());
+
+            System.out.println("http response: ");
+            System.out.println(httpResponse);
+            System.out.println();
+
+
+            DataOutputStream toClient = new DataOutputStream(socketFromProxyClient.getOutputStream());
+            toClient.writeUTF(httpResponse.toString());
             /* Write response to client. First headers, then body */
-            client.close();
-            server.close();
+            socketFromProxyClient.close();
+            socketToRemoteWebServer.close();
             /* Insert object into the cache */
             /* Fill in (optional exercise only) */
-        } catch (IOException e) {
-            System.out.println("Error writing response to client: " + e);
+        } catch (Exception e) {
+            e.printStackTrace();
         }
+
+
     }
 
 
-    /** Read command line arguments and start proxy */
-    public static void main(String[] args) {
-
-        init();
-
-        /** Main loop. Listen for incoming connections and spawn a new
-         * thread for handling them */
-        Socket client = null;
-
+    /**
+     * Read command line arguments and start proxy
+     */
+    public static void main(String[] args) throws IOException {
+        ServerSocket proxyServerSocket = new ServerSocket(12001);
         while (true) {
-            try {
-                client = socket.accept();
-                Socket finalClient = client;
-                new Thread(() -> handle(finalClient)).start();
-            } catch (IOException e) {
-                System.out.println("Error reading request from client: " + e);
-                /* Definitely cannot continue processing this request,
-                 * so skip to next iteration of while loop. */
-                continue;
-            }
+            Socket client = proxyServerSocket.accept();
+            new Thread(() -> handle(client)).start();
         }
-
     }
 }
